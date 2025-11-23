@@ -54,7 +54,7 @@ export default function HomePage() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
             </svg>
-            Developed by <span className="font-semibold text-indigo-600">George Tonmoy Roy</span>
+            Developed by <a href="https://github.com/george07-t" target="_blank" rel="noopener noreferrer" className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors">George Tonmoy Roy</a>
           </p>
         </header>
         {!token && <AuthPanel onAuth={(t) => setToken(t)} />}
