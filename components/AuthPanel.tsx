@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface Props { onAuth: (token: string) => void }
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
@@ -10,6 +10,46 @@ export const AuthPanel: React.FC<Props> = ({ onAuth }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [serverWaking, setServerWaking] = useState(true);
+  const [healthCheckAttempts, setHealthCheckAttempts] = useState(0);
+
+  useEffect(() => {
+    checkServerHealth();
+  }, []);
+
+  const checkServerHealth = async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+      
+      const response = await fetch(`${API}/auth/healthcheck/`, {
+        signal: controller.signal,
+        method: 'GET',
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        setServerWaking(false);
+      } else {
+        throw new Error('Health check failed');
+      }
+    } catch (err: any) {
+      console.log('Health check attempt:', healthCheckAttempts + 1);
+      
+      if (healthCheckAttempts < 3) {
+        // Retry up to 3 times with 2 second delay
+        setTimeout(() => {
+          setHealthCheckAttempts(prev => prev + 1);
+          checkServerHealth();
+        }, 2000);
+      } else {
+        // After 3 attempts, let user try anyway
+        setServerWaking(false);
+        setError('Backend may be starting. If login fails, please wait a moment and try again.');
+      }
+    }
+  };
 
   const submit = async () => {
     setError(null);
@@ -30,6 +70,50 @@ export const AuthPanel: React.FC<Props> = ({ onAuth }) => {
       setLoading(false);
     }
   };
+
+  // Loading overlay while server is waking up
+  if (serverWaking) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-pink-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl shadow-2xl p-12 max-w-md mx-4 text-center space-y-6 border border-indigo-100 animate-fadeIn">
+          <div className="relative">
+            <div className="w-24 h-24 mx-auto">
+              <svg className="animate-spin w-24 h-24 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg className="w-12 h-12 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-pink-600">
+              Waking Up Server
+            </h3>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              The backend server is starting up. This may take 50-60 seconds on first visit (free tier cold start).
+            </p>
+            <div className="flex items-center justify-center gap-2 text-xs text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
+              <svg className="w-4 h-4 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span>Attempt {healthCheckAttempts + 1} of 3</span>
+            </div>
+          </div>
+          
+          <div className="pt-4 border-t border-gray-200">
+            <p className="text-xs text-gray-500">
+              Please wait while we prepare your experience...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md mx-auto space-y-6 border border-indigo-100 animate-fadeIn">
