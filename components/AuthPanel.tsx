@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 
-interface Props { onAuth: (token: string) => void }
+type AuthTokens = { access: string; refresh: string };
+interface Props {
+  onAuth: (tokens: AuthTokens) => void;
+  initialMode?: 'login' | 'register';
+}
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 
-export const AuthPanel: React.FC<Props> = ({ onAuth }) => {
-  const [mode, setMode] = useState<'login'|'register'>('login');
+export const AuthPanel: React.FC<Props> = ({ onAuth, initialMode = 'login' }) => {
+  const [mode, setMode] = useState<'login'|'register'>(initialMode);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,6 +56,10 @@ export const AuthPanel: React.FC<Props> = ({ onAuth }) => {
     }
   };
 
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
   const submit = async () => {
     setError(null);
     setLoading(true);
@@ -59,11 +68,14 @@ export const AuthPanel: React.FC<Props> = ({ onAuth }) => {
         const r = await fetch(`${API}/auth/register/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, password }) });
         if (!r.ok) { setError('Registration failed'); setLoading(false); return; }
       }
-      const t = await fetch(`${API}/auth/token/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+      const t = await fetch(`${API}/auth/token/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
       const data = await t.json();
-      if (!data.access) { setError('Login failed'); setLoading(false); return; }
-      localStorage.setItem('talentrag_token', data.access);
-      onAuth(data.access);
+      if (!data.access || !data.refresh) { setError('Login failed'); setLoading(false); return; }
+      onAuth({ access: data.access, refresh: data.refresh });
     } catch (e) {
       setError('Network error');
     } finally {
@@ -132,18 +144,20 @@ export const AuthPanel: React.FC<Props> = ({ onAuth }) => {
       </div>
       
       <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
-        <button 
+        <Link
+          href="/login"
+          className={`flex-1 py-2 px-4 rounded-md font-medium transition-all text-center ${mode === 'login' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           onClick={() => setMode('login')}
-          className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${mode === 'login' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
         >
           Sign In
-        </button>
-        <button 
+        </Link>
+        <Link
+          href="/register"
+          className={`flex-1 py-2 px-4 rounded-md font-medium transition-all text-center ${mode === 'register' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           onClick={() => setMode('register')}
-          className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${mode === 'register' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
         >
           Register
-        </button>
+        </Link>
       </div>
       
       {error && (

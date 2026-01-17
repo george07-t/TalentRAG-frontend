@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { apiFetch, getApiBase } from '../lib/api';
 
 interface ChatMessage { id?: string; role: string; question?: string; answer?: string; sources?: Source[]; }
-interface Source { chunk_index: number; score: number; preview: string; }
+interface Source { chunk_index: number; score: number; preview: string; doc_type?: string; }
 
-export const ChatInterface: React.FC<{ sessionId: string; token: string | null }> = ({ sessionId, token }) => {
+export const ChatInterface: React.FC<{ sessionId: string }> = ({ sessionId }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+  const router = useRouter();
+  const API = getApiBase();
 
   useEffect(() => {
     const load = async () => {
-      const headers: HeadersInit = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API}/session/${sessionId}/chat/`, { headers });
+      const res = await apiFetch(`/session/${sessionId}/chat/`, {
+        apiBase: API,
+        onAuthFailure: () => router.replace('/login'),
+      });
       if (res.ok) {
         const data = await res.json();
         const mapped = data.map((d: any) => ({ role: d.role, question: d.question, answer: d.answer }));
@@ -31,11 +35,13 @@ export const ChatInterface: React.FC<{ sessionId: string; token: string | null }
     setLoading(true);
     try {
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API}/session/${sessionId}/chat/`, {
+      const res = await apiFetch(`/session/${sessionId}/chat/`, {
+        apiBase: API,
         method: 'POST',
         headers,
         body: JSON.stringify({ question })
+        ,
+        onAuthFailure: () => router.replace('/login'),
       });
       const data = await res.json();
       setLoading(false);
@@ -122,7 +128,7 @@ export const ChatInterface: React.FC<{ sessionId: string; token: string | null }
                         {m.sources.map((s, si) => (
                           <li key={si} className="bg-white rounded p-2 border-l-4 border-indigo-400 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                              <span className="font-medium">📄 Chunk {s.chunk_index}</span>
+                              <span className="font-medium">📄 {s.doc_type === 'job_description' ? 'JD' : 'Resume'} Chunk {s.chunk_index}</span>
                               <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">Score {s.score}</span>
                             </div>
                             <div className="text-xs text-gray-700 italic line-clamp-2">{s.preview}</div>

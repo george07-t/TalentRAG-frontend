@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
+import { apiFetch, getApiBase } from '../lib/api';
 
 interface Props { 
-  onUploaded: (sessionId: string, analysis: any) => void;
+  onUploaded: (sessionId: string) => void;
   token: string | null;
+  onAuthFailure?: () => void;
 }
 
-export const UploadForm: React.FC<Props> = ({ onUploaded, token }) => {
+export const UploadForm: React.FC<Props> = ({ onUploaded, token, onAuthFailure }) => {
   const [resume, setResume] = useState<File | null>(null);
   const [jd, setJd] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coldStarting, setColdStarting] = useState(false);
-  const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+  const API = getApiBase();
 
   const submit = async () => {
     if (!resume || !jd) return;
@@ -37,11 +39,13 @@ export const UploadForm: React.FC<Props> = ({ onUploaded, token }) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90000);
       
-      const res = await fetch(`${API}/upload/`, { 
-        method: 'POST', 
-        body: fd, 
+      const res = await apiFetch(`/upload/`, {
+        apiBase: API,
+        method: 'POST',
+        body: fd,
         headers,
-        signal: controller.signal 
+        signal: controller.signal,
+        onAuthFailure,
       });
       
       clearTimeout(coldStartTimer);
@@ -57,7 +61,7 @@ export const UploadForm: React.FC<Props> = ({ onUploaded, token }) => {
       const data = await res.json();
       setLoading(false);
       if (data.session) {
-        onUploaded(data.session, data.analysis);
+        onUploaded(data.session);
       }
     } catch (err: any) {
       setColdStarting(false);
